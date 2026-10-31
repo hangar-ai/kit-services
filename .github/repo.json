@@ -1,0 +1,11 @@
+{
+  "description": "What is running on this computer, on which port, and whose it is: listening ports and Docker containers, tied to the worker whose port block they sit in, without a terminal.",
+  "topics": [
+    "hangar-kit",
+    "hangar",
+    "claude-code",
+    "ports",
+    "docker",
+    "workers"
+  ]
+}

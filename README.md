@@ -16,7 +16,8 @@ whose worker is long gone, a container nobody remembers.
 - **Refresh.** On demand, and every 10 seconds while the tab is shown (not while it is behind another).
 - **Ask an agent to stop it.** « Ask an agent to stop this » under a port or a container opens a question:
   you pick the pane, read the brief, and send it. The agent is told to check that the thing is its own before
-  stopping it, and to say what it stopped. **The kit itself stops nothing**: no kill, no `docker stop`.
+  stopping it, and to say what it stopped. **The kit itself stops nothing**: no kill, no `docker stop`. It is not
+  offered for a program of the system or of another account, nor when the kit cannot tell whose a program is.
 - **States.** Docker not installed, Docker not running, nothing listening, no container, a command not accepted,
   Node or the system's listing tool missing: each says what it is and what to do.
 - **A skill** telling agents to open the tab with `kit_tab_open` instead of guessing with `netstat`, and never

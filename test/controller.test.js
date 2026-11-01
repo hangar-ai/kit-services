@@ -13,9 +13,9 @@ const t = fakeUi("en").i18n(logic.STRINGS);
 const portsOut = JSON.stringify({
   platform: "linux",
   ports: [
-    { port: 5432, pid: 1, name: "postgres", startedAt: "2026-10-30T08:00:00.000Z", loopback: true, portBase: null, pane: null },
-    { port: 21100, pid: 4, name: "node", startedAt: "2026-10-31T15:48:09.000Z", loopback: true, portBase: 21100, pane: "Gus" },
-    { port: 21104, pid: 5, name: "python3", startedAt: "2026-10-31T16:31:40.000Z", loopback: false, portBase: 21100, pane: "Lou" },
+    { port: 5432, pid: 1, mine: true, name: "postgres", startedAt: "2026-10-30T08:00:00.000Z", loopback: true, portBase: null, pane: null },
+    { port: 21100, pid: 4, mine: true, name: "node", startedAt: "2026-10-31T15:48:09.000Z", loopback: true, portBase: 21100, pane: "Gus" },
+    { port: 21104, pid: 5, mine: true, name: "python3", startedAt: "2026-10-31T16:31:40.000Z", loopback: false, portBase: 21100, pane: "Lou" },
   ],
   notes: [],
 });

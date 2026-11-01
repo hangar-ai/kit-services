@@ -37,6 +37,7 @@
       loopback: "local only",
       exposed: "reachable from the network",
       unknownProgram: "Unknown program",
+      notYours: "the system's, or another account's",
       hiddenNote: "Some programs belong to another account: their name is not shown.",
       blockOf: "Port block of {name}",
       blockGone: "Port block of {name}, whose pane is closed",
@@ -113,6 +114,7 @@
       loopback: "local uniquement",
       exposed: "joignable depuis le réseau",
       unknownProgram: "Programme inconnu",
+      notYours: "du système ou d'un autre compte",
       hiddenNote: "Certains programmes appartiennent à un autre compte : leur nom n'est pas affiché.",
       blockOf: "Bloc de ports de {name}",
       blockGone: "Bloc de ports de {name}, dont le panneau est fermé",
@@ -198,6 +200,8 @@
         name: typeof entry.name === "string" && entry.name ? entry.name : null,
         startedAt: typeof entry.startedAt === "string" && !Number.isNaN(Date.parse(entry.startedAt)) ? entry.startedAt : null,
         loopback: entry.loopback === true,
+        // Only a clear yes: what cannot be told is not offered for stopping.
+        mine: entry.mine === true,
         portBase: Number.isInteger(entry.portBase) ? entry.portBase : null,
         pane: typeof entry.pane === "string" && entry.pane ? entry.pane : null,
       }))

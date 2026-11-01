@@ -8,11 +8,13 @@
 // (`ps`, or the same PowerShell call), and prints one line of JSON:
 //
 //   { "platform": "linux", "ports": [{ "port", "pid", "name", "startedAt", "addresses",
-//     "loopback", "portBase", "pane" }], "notes": [] }
+//     "loopback", "mine", "portBase", "pane" }], "notes": [] }
 //
-// `portBase` and `pane` say which Hangar worker's pane a program was started in, when
-// the system lets us read that (Linux and macOS: the two HANGAR_ variables of its
-// environment, and nothing else of it). It kills nothing and writes nothing.
+// `mine` says the program is the person's to have stopped: it runs under their account (their
+// session on Windows, their uid elsewhere, never root's) and is no program of the system. It is
+// false whenever that cannot be told. `portBase` and `pane` say which Hangar worker's pane a
+// program was started in, when the system lets us read that (Linux and macOS: the two HANGAR_
+// variables of its environment, and nothing else of it). It kills nothing and writes nothing.
 // With no tool able to list ports it prints { "error": "no-tool" } and exits 2.
 const { execFile } = require("node:child_process");
 const fs = require("node:fs");
@@ -23,9 +25,10 @@ const WINDOWS_SCRIPT = [
   "$listen = @(Get-NetTCPConnection -State Listen | Select-Object LocalAddress, LocalPort, OwningProcess)",
   "$ids = @($listen | ForEach-Object { $_.OwningProcess } | Sort-Object -Unique)",
   "$procs = @(Get-CimInstance Win32_Process | Where-Object { $ids -contains [int]$_.ProcessId } | ForEach-Object {",
-  "  [pscustomobject]@{ ProcessId = [int]$_.ProcessId; Name = $_.Name; Start = ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() }",
+  "  [pscustomobject]@{ ProcessId = [int]$_.ProcessId; Name = $_.Name; Start = ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds(); Session = [int]$_.SessionId }",
   "})",
-  "[pscustomobject]@{ listen = $listen; procs = $procs } | ConvertTo-Json -Depth 4 -Compress",
+  "$own = [System.Diagnostics.Process]::GetCurrentProcess().SessionId",
+  "[pscustomobject]@{ ownSession = $own; listen = $listen; procs = $procs } | ConvertTo-Json -Depth 4 -Compress",
 ].join("\n");
 
 /** Runs a program with no shell. Resolves { code, stdout } and never rejects: a missing program is code null. */
@@ -69,6 +72,9 @@ async function listUnix(sys, platform) {
   if (pids.length) {
     const ps = await sys.run("ps", ["-o", "pid=,lstart=", "-p", pids.join(",")]);
     for (const [pid, at] of parse.parsePsStart(ps.stdout)) starts.set(pid, at);
+    const uids = parse.parsePsUid((await sys.run("ps", ["-o", "pid=,uid=", "-p", pids.join(",")])).stdout);
+    const me = sys.uid();
+    for (const row of rows) row.mine = row.pid !== null && me !== null && me !== 0 && uids.get(row.pid) === me;
     for (const pid of pids) {
       const text = platform === "darwin" ? (await sys.run("ps", ["eww", "-p", String(pid)])).stdout : sys.readEnviron(pid);
       const owner = parse.readOwner(text);
@@ -82,6 +88,7 @@ async function listUnix(sys, platform) {
 /** The system's way of reading a file or running a program, so tests can stand in for it. */
 const realSystem = {
   run,
+  uid: () => (typeof process.getuid === "function" ? process.getuid() : null),
   readEnviron(pid) {
     try {
       return fs.readFileSync(`/proc/${pid}/environ`, "latin1");
@@ -103,6 +110,7 @@ async function listPorts({ platform = process.platform, sys = realSystem } = {})
       startedAt: entry.startedAt,
       addresses: entry.addresses,
       loopback: entry.addresses.every(parse.isLoopback),
+      mine: entry.mine && !parse.isSystemProgram(entry.name),
       portBase: owner ? owner.portBase : null,
       pane: owner ? owner.pane : null,
     };

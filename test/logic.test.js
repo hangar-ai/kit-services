@@ -138,3 +138,9 @@ test("the strict id pattern", () => {
   for (const good of ["3f1c9a7b2d44", "a".repeat(64)]) assert.ok(logic.ID_PATTERN.test(good), good);
   for (const bad of ["", "abc", "-3f1c9a7b2d44", "3F1C9A7B2D44", "3f1c9a7b2d4g", "3f1c9a7b2d44 --rm", "a".repeat(65), "3f1c9a7b2d44\n"]) assert.ok(!logic.ID_PATTERN.test(bad), JSON.stringify(bad));
 });
+
+test("a program is the person's on a clear yes only", () => {
+  const entries = [true, false, "true", 1, null, undefined].map((mine, index) => ({ port: 3000 + index, pid: index + 1, mine }));
+  const { ports } = logic.parsePorts(JSON.stringify({ ports: entries }));
+  assert.deepEqual(ports.map((port) => port.mine), [true, false, false, false, false, false]);
+});

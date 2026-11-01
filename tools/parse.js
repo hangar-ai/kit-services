@@ -50,13 +50,15 @@ function parseLsof(text) {
 }
 
 /**
- * Windows: the JSON of the script in tools/ports.js, { listen: [{ LocalAddress, LocalPort,
- * OwningProcess }], procs: [{ ProcessId, Name, Start }] } (Start in ms since the epoch).
- * PowerShell writes a lone item as an object, not a list.
+ * Windows: the JSON of the script in tools/ports.js, { ownSession, listen: [{ LocalAddress,
+ * LocalPort, OwningProcess }], procs: [{ ProcessId, Name, Start, Session }] } (Start in ms since
+ * the epoch). PowerShell writes a lone item as an object, not a list. A process is the person's
+ * when it runs in their session: session 0 holds the system's services, and no person works there.
  */
 function parseWindows(text) {
   const data = JSON.parse(String(text).replace(/^﻿/, ""));
   const list = (value) => (value === null || value === undefined ? [] : Array.isArray(value) ? value : [value]);
+  const ownSession = Number.isInteger(data.ownSession) && data.ownSession !== 0 ? data.ownSession : null;
   const procs = new Map(list(data.procs).map((proc) => [Number(proc.ProcessId), proc]));
   const rows = [];
   for (const socket of list(data.listen)) {
@@ -70,6 +72,7 @@ function parseWindows(text) {
       pid,
       name: proc && proc.Name ? String(proc.Name) : null,
       startedAt: proc && Number.isFinite(Number(proc.Start)) ? new Date(Number(proc.Start)).toISOString() : null,
+      mine: Boolean(proc) && ownSession !== null && proc.Session === ownSession,
     });
   }
   return rows;
@@ -88,6 +91,26 @@ function parsePsStart(text) {
     if (!Number.isNaN(at.getTime())) starts.set(Number(pid), at.toISOString());
   }
   return starts;
+}
+
+/** `ps -o pid=,uid=`: `  812  1000` → Map pid → uid. */
+function parsePsUid(text) {
+  const uids = new Map();
+  for (const line of String(text).split(/\r?\n/)) {
+    const match = /^\s*(\d+)\s+(\d+)\s*$/.exec(line);
+    if (match) uids.set(Number(match[1]), Number(match[2]));
+  }
+  return uids;
+}
+
+const SYSTEM_PROGRAMS = new Set(
+  "system|system idle process|secure system|registry|memory compression|ntoskrnl|svchost|lsass|lsaiso|services|wininit|winlogon|csrss|smss|spoolsv|dwm|fontdrvhost|sihost|taskhostw|dllhost|conhost|wudfhost|searchindexer|msmpeng|nissrv|init|launchd|kernel_task|rapportd|sharingd|controlcenter|mdnsresponder|dbus-daemon|sshd|cupsd|avahi-daemon".split("|"),
+);
+
+/** Programs of the system itself, which can run in a person's own session too: a svchost does. */
+function isSystemProgram(name) {
+  const program = String(name || "").toLowerCase().replace(/\.exe$/, "");
+  return SYSTEM_PROGRAMS.has(program) || program === "systemd" || program.startsWith("systemd-");
 }
 
 /**
@@ -117,8 +140,9 @@ function merge(rows) {
       if (!known.addresses.includes(row.address)) known.addresses.push(row.address);
       known.name = known.name || row.name;
       known.startedAt = known.startedAt || row.startedAt || null;
+      known.mine = known.mine && row.mine === true;
     } else {
-      byKey.set(key, { port: row.port, pid: row.pid, name: row.name || null, startedAt: row.startedAt || null, addresses: [row.address] });
+      byKey.set(key, { port: row.port, pid: row.pid, name: row.name || null, startedAt: row.startedAt || null, addresses: [row.address], mine: row.mine === true });
     }
   }
   return [...byKey.values()].sort((a, b) => a.port - b.port || (a.pid || 0) - (b.pid || 0));
@@ -126,4 +150,4 @@ function merge(rows) {
 
 const isLoopback = (address) => address === "::1" || /^127\./.test(address);
 
-module.exports = { splitEndpoint, parseSs, parseLsof, parseWindows, parsePsStart, readOwner, merge, isLoopback };
+module.exports = { splitEndpoint, parseSs, parseLsof, parseWindows, parsePsStart, parsePsUid, isSystemProgram, readOwner, merge, isLoopback };

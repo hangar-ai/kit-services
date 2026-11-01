@@ -15,7 +15,8 @@ worker whose port block a port is in, and lists Docker containers with their log
    no param, and only reads: it stops nothing.
 2. Say in one line what you are looking for (a port, a container), so the person knows where to look.
 3. Stop only what you started, in your own port block. For anything else, leave it: the person
-   can use « Ask an agent to stop this » in the tab, which sends the brief to the agent they pick.
+   can use « Ask an agent to stop this » in the tab, which sends the brief to the agent they pick. The tab
+   does not offer it for a program of the system or of another account.
 
 ## Never
 

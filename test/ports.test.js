@@ -38,7 +38,32 @@ test("Windows: PowerShell writes a lone item as an object, and nothing as null",
 
 test("Windows: a listener whose process is gone keeps its port, without a name", () => {
   const rows = parse.parseWindows('{"listen":[{"LocalAddress":"0.0.0.0","LocalPort":8080,"OwningProcess":99}],"procs":[]}');
-  assert.deepEqual(rows, [{ address: "0.0.0.0", port: 8080, pid: 99, name: null, startedAt: null }]);
+  assert.deepEqual(rows, [{ address: "0.0.0.0", port: 8080, pid: 99, name: null, startedAt: null, mine: false }]);
+});
+
+const onWindows = (ownSession, name, session) =>
+  JSON.stringify({ ownSession, listen: [{ LocalAddress: "127.0.0.1", LocalPort: 8080, OwningProcess: 99 }], procs: [{ ProcessId: 99, Name: name, Start: 1, Session: session }] });
+
+test("Windows: a program is the person's only in their own session, which is never session 0", () => {
+  assert.equal(parse.parseWindows(onWindows(1, "node.exe", 1))[0].mine, true);
+  assert.equal(parse.parseWindows(onWindows(1, "node.exe", 0))[0].mine, false, "a service");
+  assert.equal(parse.parseWindows(onWindows(1, "node.exe", 2))[0].mine, false, "another person's session");
+  assert.equal(parse.parseWindows(onWindows(0, "node.exe", 0))[0].mine, false, "run from session 0, nothing can be told");
+  assert.equal(parse.parseWindows(onWindows(undefined, "node.exe", 1))[0].mine, false, "no session of its own: nothing can be told");
+});
+
+test("a program of the system is known by its name, on every system, whatever its case", () => {
+  for (const name of ["svchost.exe", "SVCHOST.EXE", "System", "System Idle Process", "lsass.exe", "services.exe", "wininit.exe", "spoolsv.exe", "systemd", "systemd-resolved", "launchd", "sshd", "mDNSResponder"]) {
+    assert.equal(parse.isSystemProgram(name), true, name);
+  }
+  for (const name of ["node.exe", "node", "python", "postgres", "systemdoc", "mysvchost.exe", null, ""]) {
+    assert.equal(parse.isSystemProgram(name), false, String(name));
+  }
+});
+
+test("`ps -o pid=,uid=` gives each program's owner, and anything else gives nothing", () => {
+  assert.deepEqual([...parse.parsePsUid("  812  1000\n   12     0\n")], [[812, 1000], [12, 0]]);
+  assert.equal(parse.parsePsUid("garbage\n 12 Sat Oct 3 09:05:00 2026\n").size, 0);
 });
 
 test("Linux ss: addresses of every shape, programs when the user may see them", () => {
@@ -94,10 +119,11 @@ test("endpoints", () => {
 });
 
 /** A stand-in for the system: answers by program name from what was recorded. */
-function standIn(answers, environs = {}) {
+function standIn(answers, environs = {}, uid = 1000) {
   const asked = [];
   return {
     asked,
+    uid: () => uid,
     async run(file, args) {
       asked.push([file, ...args]);
       const answer = answers[file];
@@ -116,9 +142,31 @@ test("ports.js on Windows: one PowerShell call, no owner, JSON ready for the tab
   assert.ok(sys.asked[0].includes("-NonInteractive"));
   assert.equal(result.platform, "win32");
   const node = result.ports.find((entry) => entry.port === 21100);
-  assert.deepEqual(node, { port: 21100, pid: 7716, name: "node.exe", startedAt: "2026-10-31T15:48:09.000Z", addresses: ["::1", "127.0.0.1"], loopback: true, portBase: null, pane: null });
+  assert.deepEqual(node, { port: 21100, pid: 7716, name: "node.exe", startedAt: "2026-10-31T15:48:09.000Z", addresses: ["::1", "127.0.0.1"], loopback: true, mine: true, portBase: null, pane: null });
   assert.equal(result.ports.find((entry) => entry.port === 21104).loopback, false);
   assert.equal(result.ports.find((entry) => entry.port === 49664).loopback, false, "a LAN address is not loopback");
+  assert.deepEqual(result.ports.filter((entry) => entry.mine).map((entry) => entry.port), [21100, 21104, 22003], "svchost, System, lsass and the services are not the person's");
+});
+
+test("ports.js: a svchost in the person's own session is still the system's", async () => {
+  const sys = standIn({ "powershell.exe": { code: 0, stdout: onWindows(1, "svchost.exe", 1) } });
+  assert.equal((await listPorts({ platform: "win32", sys })).ports[0].mine, false);
+});
+
+const listeners = [10, 11, 12, 13, 14].map((pid) => `LISTEN 0 4096 127.0.0.1:${3000 + pid} 0.0.0.0:* users:(("${pid === 14 ? "systemd-resolved" : "node"}",pid=${pid},fd=3))`).join("\n");
+const ownersOf = (args) => ({ code: 0, stdout: args[1] === "pid=,uid=" ? "10 1000\n11 1001\n12 0\n14 1000\n" : "" });
+
+test("ports.js on Linux: the person's uid is theirs; another's, root's, a program of the system and what ps does not say are not", async () => {
+  const sys = standIn({ ss: { code: 0, stdout: listeners }, ps: ownersOf });
+  const { ports } = await listPorts({ platform: "linux", sys });
+  assert.deepEqual(ports.map((entry) => [entry.pid, entry.mine]), [[10, true], [11, false], [12, false], [13, false], [14, false]]);
+});
+
+test("ports.js on Linux, run as root or with no uid to compare: nothing is offered as the person's", async () => {
+  for (const uid of [0, null]) {
+    const sys = standIn({ ss: { code: 0, stdout: 'LISTEN 0 4096 127.0.0.1:3000 0.0.0.0:* users:(("node",pid=10,fd=3))' }, ps: () => ({ code: 0, stdout: "10 0\n" }) }, {}, uid);
+    assert.equal((await listPorts({ platform: "linux", sys })).ports[0].mine, false, String(uid));
+  }
 });
 
 test("ports.js on Linux: ss, then ps for start times, then the two variables of each program", async () => {

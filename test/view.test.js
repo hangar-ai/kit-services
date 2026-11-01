@@ -12,9 +12,9 @@ const NOW = Date.parse("2026-10-31T17:02:00Z");
 const portsOut = JSON.stringify({
   platform: "linux",
   ports: [
-    { port: 5432, pid: 1, name: "postgres", startedAt: "2026-10-30T08:00:00.000Z", loopback: true, portBase: null, pane: null },
-    { port: 21100, pid: 4, name: "node", startedAt: "2026-10-31T15:48:09.000Z", loopback: true, portBase: 21100, pane: "Gus" },
-    { port: 21104, pid: 5, name: "<img src=x onerror=alert(1)>", startedAt: null, loopback: false, portBase: 21100, pane: "Lou" },
+    { port: 5432, pid: 1, mine: true, name: "postgres", startedAt: "2026-10-30T08:00:00.000Z", loopback: true, portBase: null, pane: null },
+    { port: 21100, pid: 4, mine: true, name: "node", startedAt: "2026-10-31T15:48:09.000Z", loopback: true, portBase: 21100, pane: "Gus" },
+    { port: 21104, pid: 5, mine: true, name: "<img src=x onerror=alert(1)>", startedAt: null, loopback: false, portBase: 21100, pane: "Lou" },
     { port: 21140, pid: null, name: null, startedAt: null, loopback: false, portBase: null, pane: null },
   ],
   notes: ["some-hidden"],
@@ -252,4 +252,19 @@ test("the page never writes markup, and owns nothing outside Hangar UI's classes
   const path = require("node:path");
   const text = fs.readFileSync(path.join(__dirname, "..", "tabs", "services", "view.js"), "utf8");
   assert.doesNotMatch(text, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|\.style\./);
+});
+
+test("what is not the person's offers no question to stop it, and says whose it is", async () => {
+  const row = (port, pid, name, mine) => ({ port, pid, name, startedAt: null, loopback: true, portBase: null, pane: null, ...(mine === undefined ? {} : { mine }) });
+  const ports = JSON.stringify({ platform: "win32", ports: [row(135, 1012, "svchost.exe", false), row(445, 4, "System"), row(3000, 7, "node.exe", true)], notes: [] });
+  const asks = (root, name) =>
+    root.all("svc-item").filter((item) => item.text.includes(name)).flatMap((item) => item.find((node) => node.tag === "button" && /stop this|arrêter/i.test(node.text)));
+  for (const [lang, words] of [["en", /the system's, or another account's/], ["fr", /du système ou d'un autre compte/]]) {
+    const { root } = await drawn({ commands: okCommands({ ports: reply(ports) }), lang });
+    assert.equal(asks(root, "svchost.exe").length, 0, "svchost");
+    assert.equal(asks(root, "System").length, 0, "System, which says nothing of whose it is");
+    assert.equal(asks(root, "node.exe").length, 1, "the person's own program");
+    assert.match(root.all("svc-item").find((item) => item.text.includes("svchost.exe")).text, words);
+    assert.doesNotMatch(root.all("svc-item").find((item) => item.text.includes("node.exe")).text, words);
+  }
 });

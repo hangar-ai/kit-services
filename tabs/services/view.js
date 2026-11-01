@@ -171,15 +171,18 @@
       if (row.pid !== null) facts.push(t("pid", { pid: row.pid }));
       if (row.startedAt) facts.push(t("started", { since: since(row.startedAt) }));
       facts.push(t(row.loopback ? "loopback" : "exposed"));
+      if (!row.mine) facts.push(t("notYours"));
       main.append(heading, el("span", "kit-row__sub kit-wrap", facts.join(" · ")));
       const owner = ownerLine(row);
       if (owner) {
         const ownerNode = el("span", `kit-row__sub kit-wrap${row.owner && row.owner.kind === "worker" ? " svc-owner" : ""}`, owner);
         main.append(ownerNode);
       }
-      const buttons = el("span", "kit-actions svc-actions");
-      buttons.append(askButton(askKeyPort(row), { type: "port", row }, t("portWhat", { port: row.port })));
-      main.append(buttons);
+      if (row.mine) {
+        const buttons = el("span", "kit-actions svc-actions");
+        buttons.append(askButton(askKeyPort(row), { type: "port", row }, t("portWhat", { port: row.port })));
+        main.append(buttons);
+      }
       line.append(main);
       return line;
     }

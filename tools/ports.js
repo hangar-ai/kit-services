@@ -15,10 +15,17 @@
 // false whenever that cannot be told. `portBase` and `pane` say which Hangar worker's pane a
 // program was started in, when the system lets us read that (Linux and macOS: the two HANGAR_
 // variables of its environment, and nothing else of it). It kills nothing and writes nothing.
-// With no tool able to list ports it prints { "error": "no-tool" } and exits 2.
+// With no tool able to list ports it prints { "error": "no-tool" } and exits 2, and when the
+// tool took too long, { "error": "timeout" }.
 const { execFile } = require("node:child_process");
 const fs = require("node:fs");
 const parse = require("./parse.js");
+
+/**
+ * What PowerShell may take: over 25 seconds has been measured on a busy machine. It stays under the
+ * 30 seconds the manifest gives this command, so that this script is still there to say what happened.
+ */
+const WINDOWS_TIMEOUT_MS = 27000;
 
 const WINDOWS_SCRIPT = [
   "$ErrorActionPreference = 'Stop'",
@@ -31,20 +38,29 @@ const WINDOWS_SCRIPT = [
   "[pscustomobject]@{ ownSession = $own; listen = $listen; procs = $procs } | ConvertTo-Json -Depth 4 -Compress",
 ].join("\n");
 
-/** Runs a program with no shell. Resolves { code, stdout } and never rejects: a missing program is code null. */
+/**
+ * Runs a program with no shell. Resolves { code, stdout, timedOut } and never rejects: a missing
+ * program is code null, and so is one stopped at the timeout, which `timedOut` tells apart.
+ */
 function run(file, args, { timeout = 15000 } = {}) {
   return new Promise((resolve) => {
     execFile(
       file,
       args,
       { timeout, windowsHide: true, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, LC_ALL: "C", LANG: "C" } },
-      (error, stdout) => resolve({ code: error ? (typeof error.code === "number" ? error.code : null) : 0, stdout: String(stdout || "") }),
+      (error, stdout) =>
+        resolve({
+          code: error ? (typeof error.code === "number" ? error.code : null) : 0,
+          stdout: String(stdout || ""),
+          timedOut: Boolean(error && error.killed && error.code !== "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"),
+        }),
     );
   });
 }
 
 async function listWindows(sys) {
-  const answer = await sys.run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", WINDOWS_SCRIPT]);
+  const answer = await sys.run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", WINDOWS_SCRIPT], { timeout: WINDOWS_TIMEOUT_MS });
+  if (answer.timedOut) return { timedOut: true };
   if (answer.code !== 0) return null;
   try {
     return { rows: parse.parseWindows(answer.stdout), owners: new Map(), notes: [] };
@@ -55,16 +71,19 @@ async function listWindows(sys) {
 
 async function listUnix(sys, platform) {
   let rows = null;
+  let slow = false;
   if (platform !== "darwin") {
     const ss = await sys.run("ss", ["-H", "-ltnp"]);
+    slow = ss.timedOut === true;
     if (ss.code === 0) rows = parse.parseSs(ss.stdout);
   }
   if (rows === null) {
     const lsof = await sys.run("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcn"]);
+    slow = slow || lsof.timedOut === true;
     // lsof exits 1 when it finds nothing to list, which is an answer.
     if (lsof.code === 0 || (lsof.code === 1 && !lsof.stdout.trim())) rows = parse.parseLsof(lsof.stdout);
   }
-  if (rows === null) return null;
+  if (rows === null) return slow ? { timedOut: true } : null;
 
   const pids = [...new Set(rows.map((row) => row.pid).filter((pid) => pid !== null))];
   const starts = new Map();
@@ -101,6 +120,7 @@ const realSystem = {
 async function listPorts({ platform = process.platform, sys = realSystem } = {}) {
   const found = platform === "win32" ? await listWindows(sys) : await listUnix(sys, platform);
   if (!found) return { error: "no-tool" };
+  if (found.timedOut) return { error: "timeout" };
   const ports = parse.merge(found.rows).map((entry) => {
     const owner = entry.pid === null ? null : found.owners.get(entry.pid) || null;
     return {
@@ -125,4 +145,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { listPorts, WINDOWS_SCRIPT };
+module.exports = { listPorts, run, WINDOWS_SCRIPT, WINDOWS_TIMEOUT_MS };

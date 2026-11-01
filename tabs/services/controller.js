@@ -58,13 +58,15 @@
       const answer = await command("ports");
       if (answer.ok) {
         const parsed = logic.parsePorts(answer.stdout);
-        if (parsed.error === "no-tool") return { status: "error", items: [], notes: [], kind: "no-tool", detail: "" };
+        if (parsed.error === "no-tool" || parsed.error === "timeout") return { status: "error", items: [], notes: [], kind: parsed.error, detail: "" };
         if (parsed.error) return { status: "error", items: [], notes: [], kind: "failed", detail: "" };
         return { status: "ok", items: parsed.ports, notes: parsed.notes, kind: null, detail: "" };
       }
       if (answer.kind === "denied") return { status: "denied", items: [], notes: [], kind: "denied", detail: "" };
       if (answer.kind === "missing") return { status: "error", items: [], notes: [], kind: "no-node", detail: "" };
+      // The script says which on stdout, and exits 2 for both.
       if (answer.exitCode === 2 && /no-tool/.test(answer.stdout || "")) return { status: "error", items: [], notes: [], kind: "no-tool", detail: "" };
+      if (answer.exitCode === 2 && /"timeout"/.test(answer.stdout || "")) return { status: "error", items: [], notes: [], kind: "timeout", detail: "" };
       return { status: "error", items: [], notes: [], kind: answer.kind, detail: answer.detail };
     }
 

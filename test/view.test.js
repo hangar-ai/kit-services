@@ -214,6 +214,17 @@ test("the ports could not be listed: Node missing, no tool, with a way to try ag
   assert.ok(buttonLabelled(noTool.root, "Try again"));
 });
 
+test("a listing that took too long says so, and never that no tool is here", async () => {
+  const late = () => ({ exitCode: 2, stdout: '{"error":"timeout"}\n' });
+  const en = await drawn({ commands: okCommands({ ports: late }) });
+  assert.match(en.root.text, /It took too long/);
+  assert.doesNotMatch(en.root.text, /No tool lists the ports here/);
+  assert.ok(buttonLabelled(en.root, "Try again"));
+  const fr = await drawn({ commands: okCommands({ ports: late }), lang: "fr" });
+  assert.match(fr.root.text, /C'était trop long/);
+  assert.doesNotMatch(fr.root.text, /Aucun outil ne liste les ports/);
+});
+
 test("the 10 s redraw changes nothing the person is using", async () => {
   const { root, clock, controller } = await drawn();
   await click(buttonLabelled(root, "Logs"));

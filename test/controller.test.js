@@ -118,6 +118,10 @@ test("ports: no Node, no listing tool, an answer nobody can read", async () => {
   assert.equal(garbage.state.ports.kind, "failed");
   const slow = await opened({ commands: okCommands({ ports: () => ({ exitCode: null, timedOut: true }) }) });
   assert.equal(slow.state.ports.kind, "timeout");
+  const slowTool = await opened({ commands: okCommands({ ports: () => ({ exitCode: 2, stdout: '{"error":"timeout"}\n' }) }) });
+  assert.deepEqual([slowTool.state.ports.status, slowTool.state.ports.kind], ["error", "timeout"], "the script's own limit, as it exits");
+  const slowToolOk = await opened({ commands: okCommands({ ports: () => ({ stdout: '{"error":"timeout"}' }) }) });
+  assert.equal(slowToolOk.state.ports.kind, "timeout");
 });
 
 test("nothing listening and no container are answers, not errors", async () => {

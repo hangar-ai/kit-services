@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const parse = require("../tools/parse.js");
-const { listPorts, WINDOWS_SCRIPT } = require("../tools/ports.js");
+const { listPorts, run, WINDOWS_SCRIPT, WINDOWS_TIMEOUT_MS } = require("../tools/ports.js");
 const { fixture } = require("./helpers.js");
 
 const environ = () => fs.readFileSync(path.join(__dirname, "fixtures", "linux-environ.bin"), "latin1");
@@ -210,6 +210,35 @@ test("no tool at all: an error the tab can name, not an empty list", async () =>
   assert.deepEqual(await listPorts({ platform: "linux", sys: standIn({}) }), { error: "no-tool" });
   assert.deepEqual(await listPorts({ platform: "win32", sys: standIn({ "powershell.exe": { code: 1, stdout: "" } }) }), { error: "no-tool" });
   assert.deepEqual(await listPorts({ platform: "win32", sys: standIn({ "powershell.exe": { code: 0, stdout: "not json" } }) }), { error: "no-tool" });
+});
+
+test("a tool that took too long is not a tool that is missing", async () => {
+  const late = { code: null, stdout: "", timedOut: true };
+  assert.deepEqual(await listPorts({ platform: "win32", sys: standIn({ "powershell.exe": late }) }), { error: "timeout" });
+  assert.deepEqual(await listPorts({ platform: "darwin", sys: standIn({ lsof: late }) }), { error: "timeout" });
+  assert.deepEqual(await listPorts({ platform: "linux", sys: standIn({ ss: late }) }), { error: "timeout" }, "ss late, and no lsof to ask");
+  const lsofAnswers = await listPorts({ platform: "linux", sys: standIn({ ss: late, lsof: { code: 0, stdout: fixture("macos-lsof.txt") }, ps: { code: 0, stdout: "" } }) });
+  assert.ok(lsofAnswers.ports.length > 0, "ss late, and lsof answers: there is a list");
+});
+
+test("PowerShell has at least 25 seconds, and the script keeps a margin under the manifest's limit", async () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "hangar-kit.json"), "utf8"));
+  assert.ok(WINDOWS_TIMEOUT_MS >= 25000, String(WINDOWS_TIMEOUT_MS));
+  assert.ok(WINDOWS_TIMEOUT_MS <= (manifest.commands.ports.timeoutSeconds - 2) * 1000, String(WINDOWS_TIMEOUT_MS));
+  let given = null;
+  await listPorts({ platform: "win32", sys: { run: async (file, args, options) => ((given = options), { code: 1, stdout: "" }) } });
+  assert.equal(given.timeout, WINDOWS_TIMEOUT_MS);
+});
+
+test("running a program tells a timeout from a failure and from a missing program", async () => {
+  const late = await run(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { timeout: 300 });
+  assert.deepEqual([late.code, late.timedOut], [null, true]);
+  const failed = await run(process.execPath, ["-e", "process.exit(3)"]);
+  assert.deepEqual([failed.code, failed.timedOut], [3, false]);
+  const missing = await run("no-such-program-here", []);
+  assert.deepEqual([missing.code, missing.timedOut], [null, false]);
+  const fine = await run(process.execPath, ["-e", "console.log('yes')"]);
+  assert.deepEqual([fine.code, fine.stdout.trim(), fine.timedOut], [0, "yes", false]);
 });
 
 test("the tool only reads: no kill, no stop, no write in it", () => {

@@ -23,7 +23,7 @@ whose worker is long gone, a container nobody remembers.
 - **A skill** telling agents to open the tab with `kit_tab_open` instead of guessing with `netstat`, and never
   to stop what they did not start.
 
-It is drawn with [Hangar UI](https://github.com/simnJS/hangar-ai/blob/main/docs/kit-ui.md): Hangar's theme, language (English and French) and interface
+It is drawn with [Hangar UI](https://github.com/hangar-ai/hangar/blob/main/docs/kit-ui.md): Hangar's theme, language (English and French) and interface
 size, and it holds at the side panel's narrowest.
 
 ## What it runs
@@ -108,7 +108,7 @@ No install step. They cover each system's output on recorded text (`test/fixture
 is recorded and which is written from the tool's documented format), the script with a stand-in for the
 system so no real process is asked for anything, the page's logic, the controller on a fake Hangar (refresh
 every 10 s, hidden tabs, denied, Docker off, the question), what the view draws in each state in both
-languages, and the manifest against the rules in [docs/kits.md](https://github.com/simnJS/hangar-ai/blob/main/docs/kits.md), whose validator is Rust.
+languages, and the manifest against the rules in [docs/kits.md](https://github.com/hangar-ai/hangar/blob/main/docs/kits.md), whose validator is Rust.
 
 ## This repository
 

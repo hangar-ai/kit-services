@@ -35,6 +35,7 @@
       "id": "services",
       "title": "Services",
       "entry": "tabs/services/index.html",
+      "native": "tabs/services.wasm",
       "icon": "icon.svg",
       "permissions": ["command:ports", "command:docker-list", "command:docker-logs", "panes.read", "panes.send"],
       "singleton": true

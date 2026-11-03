@@ -76,9 +76,25 @@ test("the tab: the permissions the brief asks for and none more, every command i
   assert.equal(tab.id, "services");
   assert.equal(tab.title, "Services");
   safePath(tab.entry, [".html"], "entry");
+  safePath(tab.native, [".wasm"], "native");
   safePath(tab.icon, [".svg"], "icon");
   assert.deepEqual([...tab.permissions].sort(), ["command:docker-list", "command:docker-logs", "command:ports", "panes.read", "panes.send"]);
   for (const permission of tab.permissions.filter((item) => item.startsWith("command:"))) assert.ok(manifest.commands[permission.slice(8)], permission);
+});
+
+test("the native module: the file the manifest names, built for Hangar's ABI and for nothing else", () => {
+  const [tab] = manifest.tabs;
+  // Schema 1 and the page stay for Hangar 1.x, which ignores the field and opens the page.
+  assert.equal(manifest.schema, 1);
+  assert.equal(tab.entry, "tabs/services/index.html");
+  assert.equal(tab.native, "tabs/services.wasm");
+  const bytes = fs.readFileSync(path.join(KIT, tab.native));
+  assert.deepEqual([...bytes.subarray(0, 8)], [0, 0x61, 0x73, 0x6d, 1, 0, 0, 0], "a WebAssembly module");
+  assert.ok(bytes.length < 4 * 1024 * 1024, "far under the 64 MB a kit file may be");
+  const text = bytes.toString("latin1");
+  for (const name of ["hangar_abi_version", "hangar_alloc", "hangar_init", "hangar_update", "hangar_view"]) assert.ok(text.includes(name), `exports ${name}`);
+  assert.ok(!text.includes("wasi_snapshot_preview1"), "built for wasm32-unknown-unknown, not WASI");
+  assert.ok(!text.includes("__wbindgen"), "no wasm-bindgen glue");
 });
 
 test("the skill says what the brief says", () => {
@@ -127,7 +143,7 @@ test("nothing personal, nothing outside its folder is named", () => {
   const files = [];
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if ([".git", ".hangar-ui", "node_modules"].includes(entry.name)) continue;
+      if ([".git", ".hangar-ui", "node_modules", "target"].includes(entry.name)) continue;
       if (entry.isDirectory()) walk(path.join(dir, entry.name));
       else files.push(path.join(dir, entry.name));
     }

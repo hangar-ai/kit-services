@@ -1,10 +1,8 @@
-//! `test/manifest.test.js`, for the field this port adds: the tab's `native`
-//! names an existing `.wasm` file inside the kit, and that file is a module
-//! Hangar will load (the ABI of docs/native/kits-native.md).
+//! The manifest's tab: its `entry` names an existing `.wasm` file inside the
+//! kit, and that file is a module Hangar will load (the ABI of
+//! docs/native/kits-native.md). The rest is checked by test/manifest.test.js.
 
 mod common;
-
-use std::path::Path;
 
 use common::{kit, manifest};
 
@@ -13,23 +11,24 @@ fn tab() -> serde_json::Value {
 }
 
 #[test]
-fn the_manifest_stays_schema_1_with_its_page_and_adds_the_module() {
+fn the_manifest_is_schema_2_with_the_module_as_the_entry() {
     let manifest = manifest();
-    // Hangar 1.x ignores `native` and opens the page; the native Hangar opens
-    // the module, and the page only when the module cannot load.
-    assert_eq!(manifest["schema"], 1);
-    assert_eq!(manifest["hangar"], ">=1.9.0");
+    assert_eq!(manifest["schema"], 2, "a native tab needs schema 2");
+    assert_eq!(manifest["hangar"], ">=2.0.0");
     let tab = tab();
-    assert_eq!(tab["entry"], "tabs/services/index.html");
-    assert_eq!(tab["native"], "tabs/services.wasm");
+    assert_eq!(tab["entry"], "tabs/services.wasm");
+    assert!(
+        tab.get("native").is_none(),
+        "schema 2 has no `native` field"
+    );
     assert_eq!(tab["id"], "services");
     assert_eq!(tab["singleton"], true);
 }
 
 #[test]
-fn native_names_an_existing_wasm_file_inside_the_kit() {
+fn the_entry_names_an_existing_wasm_file_inside_the_kit() {
     let tab = tab();
-    let native = tab["native"].as_str().expect("native is a path");
+    let native = tab["entry"].as_str().expect("entry is a path");
     assert!(
         !native.starts_with('/') && !native.starts_with('\\') && !native.contains(':'),
         "{native}: must stay inside the kit"
@@ -55,8 +54,8 @@ fn native_names_an_existing_wasm_file_inside_the_kit() {
 }
 
 #[test]
-fn the_permissions_and_commands_are_the_pages() {
-    // The module asks nothing the page did not: the same five permissions.
+fn the_permissions_and_commands_are_the_five_the_tab_needs() {
+    // The tab asks for these five permissions and no more.
     let mut granted = common::granted();
     granted.sort();
     assert_eq!(
@@ -206,23 +205,5 @@ fn the_module_is_small_and_carries_no_path_of_the_machine_that_built_it() {
     }
     for personal in ["/home/", "/Users/", "C:\\Users"] {
         assert!(!text.contains(personal), "the module names {personal}");
-    }
-}
-
-#[test]
-fn the_page_the_older_hangar_opens_is_still_there() {
-    let entry = tab()["entry"].as_str().unwrap().to_owned();
-    assert!(Path::new(&kit().join(&entry)).is_file(), "{entry}");
-    for script in [
-        "logic.js",
-        "controller.js",
-        "view.js",
-        "app.js",
-        "style.css",
-    ] {
-        assert!(
-            kit().join("tabs/services").join(script).is_file(),
-            "{script}"
-        );
     }
 }

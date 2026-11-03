@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "id": "services",
   "name": "Services",
   "version": "0.1.2",
@@ -7,7 +7,7 @@
   "author": "Hangar",
   "homepage": "https://github.com/hangar-ai/kit-services",
   "icon": "icon.svg",
-  "hangar": ">=1.9.0",
+  "hangar": ">=2.0.0",
   "gallery": {
     "permissionsSummary": "Runs three read-only commands (a small Node script that lists listening ports, docker ps and docker logs), reads the workspace's panels to name a port's worker, and sends a message to a panel only when you ask an agent to stop something. It stops nothing itself.",
     "tags": ["ports", "docker", "workers", "tab"]
@@ -34,8 +34,7 @@
     {
       "id": "services",
       "title": "Services",
-      "entry": "tabs/services/index.html",
-      "native": "tabs/services.wasm",
+      "entry": "tabs/services.wasm",
       "icon": "icon.svg",
       "permissions": ["command:ports", "command:docker-list", "command:docker-logs", "panes.read", "panes.send"],
       "singleton": true

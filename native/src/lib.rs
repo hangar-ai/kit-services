@@ -7,13 +7,12 @@
 //! sends a brief to the pane the person picks, and the kit stops nothing
 //! itself.
 //!
-//! This is `tabs/services/{controller,view,app}.js` in Rust, with the same
-//! host calls (`command.run`, `panes.list`, `panes.send`) under the same
-//! permissions. The pure parts, `tabs/services/logic.js`, are in [`logic`].
+//! Its host calls are `command.run`, `panes.list` and `panes.send`, under the
+//! manifest's permissions. The pure parts are in [`logic`].
 //!
-//! - **State**: [`Services`] is what the page's controller held.
+//! - **State**: [`Services`] is everything the tab holds.
 //! - **Calls are tasks**: the three reads go out together, and the page is
-//!   updated once all three have come back, as `Promise.all` did.
+//!   updated once all three have come back.
 //! - **The poll** is a one-shot `cx.after("refresh", …)` armed when a read
 //!   ends, so a read never overlaps the next, and none is armed behind another
 //!   tab.
@@ -41,7 +40,7 @@ pub const REFRESH_EVERY: Duration = Duration::from_secs(10);
 /// The most of a failure's own words that is shown.
 const DETAIL_CHARS: usize = 500;
 
-/// How tall a container's log is drawn, in pixels (the page's `40vh`).
+/// How tall a container's log is drawn, in pixels (a fixed height).
 const LOG_HEIGHT: f32 = 320.0;
 
 // ---------------------------------------------------------------- State.

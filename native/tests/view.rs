@@ -1,4 +1,4 @@
-//! `test/view.test.js`: what the tab draws for each state, both languages,
+//! What the tab draws for each state, both languages,
 //! every state designed.
 
 mod common;

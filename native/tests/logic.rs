@@ -1,5 +1,5 @@
-//! `test/logic.test.js`: what the tab knows apart from Hangar and the page,
-//! on the tools' recorded output.
+//! What the tab knows apart from Hangar and the widgets, on the tools' recorded
+//! output.
 
 mod common;
 
@@ -372,7 +372,7 @@ fn what_a_refusal_means_and_whether_docker_is_off_or_just_failing() {
     assert_eq!(logic::classify("denied"), Fault::Denied);
     assert_eq!(logic::classify("not_found"), Fault::Missing);
     assert_eq!(logic::classify("busy"), Fault::Busy);
-    // The 30 s limit of kit.js is gone: only a command's own `timedOut` is a timeout.
+    // No client-side limit: only a command's own `timedOut` is a timeout.
     for code in ["", "failed", "unavailable", "rate_limited", "bad_args"] {
         assert_eq!(logic::classify(code), Fault::Failed, "{code}");
     }
@@ -471,7 +471,7 @@ fn a_program_is_the_persons_on_a_clear_yes_only() {
 
 #[test]
 fn a_log_line_reads_as_an_error_as_hangar_uis_is_error_line_says() {
-    // kit-ui.js's isErrorLine: the words of an error, in English and French,
+    // The words of an error, in English and French,
     // not those of "0 errors" or `handles_failure_mode`.
     for error in [
         "Error: connect ECONNREFUSED 172.17.0.2:5432",

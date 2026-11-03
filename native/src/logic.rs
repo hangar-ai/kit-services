@@ -1,10 +1,10 @@
-//! What the Services tab knows, apart from Hangar and from the page: the
+//! What the Services tab knows, apart from Hangar and from the widgets: the
 //! tools' answers read into rows, which worker a port belongs to, what a
 //! failure means, the brief an agent is sent, and the tab's words in English
 //! and French (the glossary of Hangar's own strings: tu, panneau, workspace,
 //! Settings).
 //!
-//! This is `tabs/services/logic.js` in Rust. Nothing here calls Hangar or
+//! Nothing here calls Hangar or
 //! draws; it takes text and answers data, so the tests read it directly.
 
 use std::cmp::Ordering;
@@ -150,7 +150,7 @@ pub const EN: &[(&str, &str)] = &[
         "Accept the commands of Services in Settings › Kits, then reload the tab.",
     ),
     ("tryAgain", "Try again"),
-    // What the page's log widget said by itself, and its copy button.
+    // What the log block says by itself, and its copy button.
     ("errors_one", "{n} error"),
     ("errors_other", "{n} errors"),
     ("errorAt", "Error {at} of {n}"),
@@ -1017,8 +1017,8 @@ impl Fault {
     }
 }
 
-/// The fault of a refused call, by its code. The 30 s limit kit.js put on a
-/// call is gone natively: a timeout is only a command's own `timedOut`.
+/// The fault of a refused call, by its code. A call has no
+/// client-side limit: a timeout is only a command's own `timedOut`.
 pub fn classify(code: &str) -> Fault {
     match code {
         "denied" => Fault::Denied,

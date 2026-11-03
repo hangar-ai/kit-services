@@ -1,22 +1,18 @@
 "use strict";
-// Hangar's own files, which some tests compare against: Hangar UI's sheet, so that a class a page
-// names exists, and the docs, so that a method it calls is documented. Hangar ships them, so this
-// repository holds no copy. CI gets them at the tag the manifest's `hangar` names and passes the
-// folder in HANGAR_UI_DIR. Without them, the tests that need them skip and say so.
+// Hangar's own files, which a test compares against: the docs, so that a method the kit relies on
+// is documented. Hangar ships them, so this repository holds no copy. CI gets them at the tag the
+// manifest's `hangar` names and passes the folder in HANGAR_UI_DIR. Without them, the test that
+// needs them skips and says so.
 //
 //   node test/hangar-ui.js --get           into .hangar-ui/, which git ignores
-//   node test/hangar-ui.js --get v1.9.0    from another Hangar tag
+//   node test/hangar-ui.js --get v2.0.0    from another Hangar tag
 const fs = require("node:fs");
 const path = require("node:path");
 
 const KIT = path.join(__dirname, "..");
 const DIR = process.env.HANGAR_UI_DIR ? path.resolve(process.env.HANGAR_UI_DIR) : path.join(KIT, ".hangar-ui");
 const FILES = {
-  "kit.css": "src-tauri/kit-sdk/kit.css",
-  "kit.js": "src-tauri/kit-sdk/kit.js",
-  "kit-ui.js": "src-tauri/kit-sdk/kit-ui.js",
   "kits.md": "docs/kits.md",
-  "kit-ui.md": "docs/kit-ui.md",
 };
 const HANGAR_FILES_MISSING = "Hangar's files are not here: run `node test/hangar-ui.js --get`, then the tests again";
 

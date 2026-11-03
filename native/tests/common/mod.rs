@@ -1,6 +1,5 @@
 //! Shared by the tests: the recorded output of the tools, a pretend Hangar
-//! that answers the tab's calls as docs/kits.md says (`test/helpers.js`'s
-//! `fakeHangar`), and ways to read the page the tab draws.
+//! that answers the tab's calls as docs/kits.md says, and ways to read the page the tab draws.
 #![allow(dead_code)]
 
 use std::path::{Path, PathBuf};

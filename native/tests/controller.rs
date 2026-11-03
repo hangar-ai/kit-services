@@ -1,4 +1,4 @@
-//! `test/controller.test.js`: the tab on a pretend Hangar: what it reads,
+//! The tab on a pretend Hangar: what it reads,
 //! when, and what it does when Docker is off, a command is denied or the
 //! person asks an agent to stop something.
 
@@ -507,8 +507,8 @@ fn the_tabs_language_follows_hangars() {
 
 #[test]
 fn the_tabs_calls_are_only_those_the_manifest_grants() {
-    // The page's code called `command.run`, `panes.list` and `panes.send`, and
-    // ran `ports`, `docker-list` and `docker-logs`: every call of a session is
+    // The tab calls `command.run`, `panes.list` and `panes.send`, and
+    // runs `ports`, `docker-list` and `docker-logs`: every call of a session is
     // held to the tab's permissions as Hangar holds it.
     let granted = granted();
     let mut world = world();

@@ -12,3 +12,37 @@ permissions:
 jobs:
   kit-check:
     uses: hangar-ai/.github/.github/workflows/kit-check.yml@v1
+
+  # The native tab (native/): formatted, linted, tested on the SDK's harness, and the module the
+  # repository holds against a fresh build of the source, byte for byte. Hangar runs the committed
+  # tabs/services.wasm and never builds one, so a module that is not what the source builds is a tab
+  # that is not what was written. Every command runs in native/, where rust-toolchain.toml pins the
+  # compiler that built the committed module.
+  native:
+    name: Native tab (Rust, WebAssembly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: native-${{ runner.os }}-${{ hashFiles('native/Cargo.lock', 'native/rust-toolchain.toml') }}
+      - name: The toolchain native/rust-toolchain.toml names
+        working-directory: native
+        run: rustup toolchain install
+      - name: Format
+        working-directory: native
+        run: cargo fmt --check
+      - name: Lint
+        working-directory: native
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Test
+        working-directory: native
+        run: cargo test --locked
+      - name: The committed module is what native/ builds
+        run: scripts/build-native.sh --check

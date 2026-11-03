@@ -23,8 +23,15 @@ whose worker is long gone, a container nobody remembers.
 - **A skill** telling agents to open the tab with `kit_tab_open` instead of guessing with `netstat`, and never
   to stop what they did not start.
 
-It is drawn with [Hangar UI](https://github.com/hangar-ai/hangar/blob/main/docs/kit-ui.md): Hangar's theme, language (English and French) and interface
-size, and it holds at the side panel's narrowest.
+The tab comes in two forms, with the same behaviour, the same three commands and the same two pane permissions:
+
+- **Native** (a Hangar that runs native tabs): `tabs/services.wasm`, a Rust module that describes the page and that
+  Hangar draws itself, in your theme, language (English and French) and interface size. No browser engine runs for it.
+- **A page** (Hangar 1.x, which ignores the module, and the native Hangar when the module cannot be loaded): the HTML
+  tab in `tabs/services/`, drawn with [Hangar UI](https://github.com/hangar-ai/hangar/blob/main/docs/kit-ui.md).
+
+Both hold at the side panel's narrowest. What the native tab does not do, and why, is under
+[Native or page](#native-or-page).
 
 ## What it runs
 
@@ -69,18 +76,27 @@ part says so and the ports still show.
 2. Enable it on a workspace, and read what you accept: the three commands and the two pane permissions.
 3. Restart the workspace's Claude Code panes so they load the skill.
 
+There is nothing to build: Hangar runs the module the kit ships (`tabs/services.wasm`, committed) and never builds one.
+
 ## How it is built
 
 ```
 services/
-├── hangar-kit.json            the kit: id, hangar >=1.9.0, the three commands, the tab
+├── hangar-kit.json            the kit: id, hangar >=1.9.0, the three commands, the tab (entry: the page, native: the module)
 ├── icon.svg
 ├── .claude-plugin/plugin.json the Claude Code plugin (name = the kit's id): a skill, nothing that runs by itself
 ├── skills/services/SKILL.md
 ├── tools/
 │   ├── ports.js               the `ports` command: runs the system's tool, prints one line of JSON
 │   └── parse.js               pure readers of PowerShell's JSON, ss, lsof, ps and an environment
-├── tabs/services/
+├── tabs/services.wasm         the native tab, built from native/ and committed: what the native Hangar runs
+├── native/                    the native tab: a Rust crate (cdylib + rlib) on hangar-kit-sdk
+│   ├── Cargo.toml, Cargo.lock, rust-toolchain.toml   the SDK from git, the lockfile, the compiler that is pinned
+│   ├── src/logic.rs           tabs/services/logic.js in Rust: pure, the tools' text → rows, whose a port is, the brief, the words
+│   ├── src/lib.rs             controller.js and view.js in Rust: the state, the three reads, the page
+│   └── tests/                 test/*.test.js in Rust, on the SDK's harness; the same fixtures (test/fixtures/)
+├── scripts/build-native.sh    builds tabs/services.wasm (--check: fails if the committed one is not that build)
+├── tabs/services/             the page, which Hangar 1.x opens
 │   ├── index.html             loads Hangar UI (/_hangar/kit.css, kit.js, kit-ui.js), then the files below
 │   ├── logic.js               pure: what the tools said → rows, whose a port is, the brief; strings en and fr
 │   ├── controller.js          reads, refreshes every 10 s while shown, logs, the question; takes window.hangar
@@ -92,23 +108,76 @@ services/
 ```
 
 - **A redraw changes only what changed.** The page is redrawn every 10 seconds: each part is rebuilt only
-  when what it shows changed, so an open question, a selection or a log's scroll is never lost.
+  when what it shows changed, so an open question, a selection or a log's scroll is never lost. (The native tab
+  draws its whole view each time and what is open is part of its state, which a read leaves as it is; Hangar
+  keeps the scroll of a log and the focus of a field.)
 - **Declared commands, not a shell.** Each is an argv. `{id}` is the only placeholder, with a strict rule,
   and Hangar refuses a value starting with `-`.
 - **The kit cannot stop anything.** The commands are reads, `ports.js` has no way to kill, and a test fails if
   the manifest, the script or the page gains one.
 
+### The native tab
+
+`native/` is a Rust crate that builds to `wasm32-unknown-unknown` (never `wasm32-wasip1`, no wasm-bindgen) and depends
+on [`hangar-kit-sdk`](https://github.com/hangar-ai/hangar/tree/feat/native-rust/crates/hangar-kit-sdk). The tab keeps
+the page's host calls and permissions, and nothing else: `command.run` of the three declared commands, `panes.list`
+and `panes.send`, and, for the log's Copy button, `ui.copy` and a toast, which ask for no permission. A read is three
+calls that go out together; the page changes once they are all back, and the next read is armed 10 seconds after,
+only while the tab is in front. Every string is in `native/src/logic.rs`, in English and in French.
+
+Hangar never builds a kit, so the module is committed with the source that made it:
+
+```
+rustup target add wasm32-unknown-unknown      # once, unless rustup does it for you (native/rust-toolchain.toml)
+scripts/build-native.sh                       # native/ → tabs/services.wasm
+scripts/build-native.sh --check               # build, and fail if tabs/services.wasm is not that build
+```
+
+The compiler is pinned in `native/rust-toolchain.toml`, the lockfile is held to, and the build names neither the
+kit's folder nor Cargo's: the same source gives the same module in any folder, with any `CARGO_HOME`, which is what
+lets CI tell a stale one. Change the source or the compiler, rebuild, commit both. To look at it: link this folder in
+Hangar (Settings › Kits) and reload the tab from its bar after each build, or, without Hangar,
+`cargo run -p hangar-kit-host --example preview -- tabs/services.wasm` from the Hangar repository (it does not run
+commands, so the tab shows its refusals there).
+
+### Native or page
+
+What the native tab does differently, or cannot do, and why:
+
+- **Text cannot be selected with the pointer** (iced's text has no selection). The log has a Copy button, in
+  its bar; the brief is shown to be read and is sent as it is.
+- **No accessibility roles** (`role=alert`, `aria-*`): iced has no accessibility tree yet. Icons and glyphs
+  have tooltips naming them.
+- **A line of a log is not wrapped.** A log keeps its lines whole so that a long one stays cheap; it scrolls
+  sideways for a longer line, and its height is 320 px, not 40 % of the window.
+- **No client-side timeout on a call.** kit.js gave up on a call after 30 s; natively only a command's own limit
+  remains (30 s for `ports`, 20 s for Docker), and it says `timedOut`, which is shown as "It took too long".
+- **A redraw is of the whole view**, as above; nothing the person had open is lost to it.
+- **Send waits for a pane.** The page let Send be pressed with no pane picked and did nothing; the button is
+  disabled until one is.
+- **A filter with nothing to filter by shows everything.** After the last worker port goes, the page showed an empty
+  list under the "Worker ports" filter, which was no longer offered.
+- **The brief is plain text.** Hangar's typography (a no-break space between a number and its unit, a narrow one
+  before a French colon) is left out of what an agent is sent.
+
 ## Tests
 
 ```
-node --test kits/services/
+node --test kits/services/                        # the page, the tools, the manifest
+cargo test --manifest-path native/Cargo.toml      # the native tab
 ```
 
-No install step. They cover each system's output on recorded text (`test/fixtures/README.md` says which
+The Node tests have no install step. They cover each system's output on recorded text (`test/fixtures/README.md` says which
 is recorded and which is written from the tool's documented format), the script with a stand-in for the
 system so no real process is asked for anything, the page's logic, the controller on a fake Hangar (refresh
 every 10 s, hidden tabs, denied, Docker off, the question), what the view draws in each state in both
 languages, and the manifest against the rules in [docs/kits.md](https://github.com/hangar-ai/hangar/blob/main/docs/kits.md), whose validator is Rust.
+
+The Rust tests are those cases again, with the same recorded output, on the SDK's `testing::Harness` (the module's own
+runtime, on the host, answering the tab's calls by hand): `tests/logic.rs`, `tests/controller.rs` (what is read, when,
+what each refusal means, the question, which calls are made and that each is granted), `tests/view.rs` (what each
+state draws, in both languages) and `tests/manifest.rs` (`native` names an existing `.wasm` inside the kit, and it
+imports Hangar's `log` and `now` and nothing else). The Node tests of the page, the tools and the manifest stay as they were.
 
 ## This repository
 
@@ -118,6 +187,8 @@ skip what needs those files, and say so:
 
 - the permissions and methods used are in the docs, when the docs are around
 
-CI calls [kit-check](https://github.com/hangar-ai/.github/blob/main/.github/workflows/kit-check.yml). A release is
+CI calls [kit-check](https://github.com/hangar-ai/.github/blob/main/.github/workflows/kit-check.yml), and has a job of
+its own for the native tab: format, lints, the Rust tests, and `scripts/build-native.sh --check`, which fails when the
+committed `tabs/services.wasm` is not what `native/` builds. A release is
 a tag, `v` and the manifest's version, and it reaches Hangar's gallery once
 [the catalog](https://github.com/hangar-ai/catalog) is updated and reviewed.

@@ -11,9 +11,9 @@ permissions:
 
 jobs:
   kit-check:
-    uses: hangar-ai/.github/.github/workflows/kit-check.yml@v1
+    uses: hangar-ai/.github/.github/workflows/kit-check.yml@rust-rewrite
 
-  # The native tab (native/): formatted, linted, tested on the SDK's harness, and the module the
+  # The native tab (native/), which is the kit's tab: formatted, linted, tested on the SDK's harness, and the module the
   # repository holds against a fresh build of the source, byte for byte. Hangar runs the committed
   # tabs/services.wasm and never builds one, so a module that is not what the source builds is a tab
   # that is not what was written. Every command runs in native/, where rust-toolchain.toml pins the

@@ -1,0 +1,9 @@
+# The compiler that builds tabs/services.wasm. A module is only the same bytes
+# from the same compiler, and CI checks the committed one against a fresh
+# build, so the version is pinned: change it, rebuild the module
+# (scripts/build-native.sh) and commit both.
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]
